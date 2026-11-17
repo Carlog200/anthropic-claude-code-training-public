@@ -37,3 +37,9 @@ Work is submitted as a pull request against this repository and scored automatic
 - Branch from `main` with the ticket ID: `NWP-201-issue-cards`
 - Commit subjects carry the ticket ID: `NWP-201: issue virtual cards`
 - Fill in the pull request template. The grader reads it.
+
+## Release Standards
+
+- All changes need test evidence before merging. Put the test command you ran and its summary line in the PR's "How I verified it" section; for the merchant console that is `npm test` in `build-battle/merchant-console`.
+- No direct commits to `main`. Work lands through a ticket branch and a pull request.
+- Every PR must include a one-line business impact summary: in plain language, who benefits and how.
