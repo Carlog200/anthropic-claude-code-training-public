@@ -1,25 +1,54 @@
 import { filterPayments, parseFilters, sortPayments } from "@/data/queries"
-import { exportFilename, toCsv } from "@/lib/csv"
-import { NextRequest } from "next/server"
+import {
+  exportFilename,
+  exportScopeLabel,
+  parseExportColumns,
+  parseExportScope,
+  toCsv,
+} from "@/lib/csv"
+import { NextRequest, NextResponse } from "next/server"
 
 /**
  * Exports the payments table as CSV.
  *
- * Honors the active filters and reuses the query builder, but the column set
- * and the scope are fixed. Giving ops control over both is NWP-101.
+ * Query params, all validated here before use:
+ * - the usual filters, through `parseFilters`
+ * - `scope`: `filter` (default) or `all`
+ * - `columns`: comma-separated, from `EXPORT_COLUMNS`; defaults to every
+ *   column except the card last four
+ *
+ * Rows come from the shared query builder without pagination, so the file
+ * holds every matching payment, not the page on screen.
  */
 export function GET(request: NextRequest) {
-  const filters = parseFilters(request.nextUrl.searchParams)
-  const rows = sortPayments(
-    filterPayments(filters),
-    filters.sort,
-    filters.direction,
+  const params = request.nextUrl.searchParams
+
+  const scope = parseExportScope(params.get("scope"))
+  if (!scope.ok) return badRequest(scope.error)
+
+  const columns = parseExportColumns(params.get("columns"))
+  if (!columns.ok) return badRequest(columns.error)
+
+  const filters = parseFilters(params)
+  const matching =
+    scope.value === "all"
+      ? filterPayments({ status: "all" })
+      : filterPayments(filters)
+  const rows = sortPayments(matching, filters.sort, filters.direction)
+
+  const filename = exportFilename(
+    new Date(),
+    exportScopeLabel(scope.value, filters),
   )
 
-  return new Response(toCsv(rows), {
+  return new Response(toCsv(rows, columns.value), {
     headers: {
       "content-type": "text/csv; charset=utf-8",
-      "content-disposition": `attachment; filename="${exportFilename()}"`,
+      "content-disposition": `attachment; filename="${filename}"`,
     },
   })
+}
+
+function badRequest(message: string) {
+  return NextResponse.json({ error: { message } }, { status: 400 })
 }
